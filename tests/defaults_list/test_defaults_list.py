@@ -86,6 +86,16 @@ Plugins.instance()
 #  - (Y) ensure all tests are passing
 #  - (Y) implement --info=defaults-tree output
 
+# TODO: (Y) rename support:
+#  - (Y) Remove rename support form 1.1
+#  - (Y) Deprecate rename support in 1.0 : task filed
+
+# TODO: cleanup
+#  - (Y) Remove previous implementation of recursive defaults list and rename new_defaults_list to defaults_list etc.
+#  - (Y) Delete tests and test data of old defaults list impl
+#  - (Y) Clean up package logic from config sources
+#  - (Y) Clean up Hydra 1.0 warnings related to package header
+
 # TODO: Followup items
 #  - (Y) Consider retaining the final choices in the hydra config node to allow interpolation with their values.
 #  - (Y) Enforce that overrides are at the end of the defaults list
@@ -95,18 +105,7 @@ Plugins.instance()
 #  - (Y) Profile and optimize default tree composition: speed in line with 1.0
 #  - (Y) Test cases when config group name matches a keyword (optional, override)
 #  - (Y) Clean up sporadic TODOs in the code
-
-# TODO: (Y) rename support:
-#  - (Y) Remove rename support form 1.1
-#  - Deprecate rename support in 1.0
-
-
-# TODO: cleanup
-#  - (Y) Remove previous implementation of recursive defaults list and rename new_defaults_list to defaults_list etc.
-#  - (Y) Delete tests and test data of old defaults list impl
-#  - Clean up package logic from config sources
-#  - Clean up Hydra 1.0 warnings related to package header
-
+#  - (Y) Evaluate possibility of changing default _self_ location to trailing
 
 # TODO Documentation
 #  - Update defaults list documentation
@@ -118,10 +117,8 @@ Plugins.instance()
 #  - Document hydra.choices
 #  - Add news fragments for user facing features
 
-
 # TODO: Followup items to explore
 #  - Consider deprecating automatic schema support in favor of extending a config via recursive defaults
->>>>>>> e19da87be... added hydra.choices node
 
 
 @mark.parametrize(  # type: ignore
