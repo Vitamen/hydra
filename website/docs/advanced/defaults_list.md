@@ -13,210 +13,176 @@ Please report any issues.
 A Defaults List determines how to build a config object from other configs, and in what order. 
 Each config can have a Defaults List as a top level element. The Defaults List itself is not a part of resulting config.
 
-The most common items in the Default List are Config Group Defaults, which determines which config group option
-to use from a particular config group.
-
-```yaml
+An example of a Defaults List:
+```yaml title="config.yaml"
 defaults:
- - db: mysql # use mysql as the choice for the db config group
+  - db: mysql
 ```
 
-Sometimes a config file should be loaded unconditionally. Such configs can be specified as a string in the 
-Defaults List:
+## Default List entries are relative by default
+
+Given this config directory:
+```
+db/
+  mysql.yaml
+  engine/
+    innodb.yaml
+    myiasm.yaml
+webserver/
+  apache.yaml
+```
+
+From within **db/mysql.yaml**, the correct way to address **engine/innodb**, and **webserver/apache** is:
+```yaml title="db/mysql.yaml"
+defaults:
+ - engine: innodb
+ - /webserver: apache
+```
+
+## Default List Overrides
+A Defaults List can contain overrides that can change the choice for config groups that are defined elsewhere.
+Such overrides are prefixed with the `override` keyword, and can only be added at the end of the Defaults List.
 ```yaml
 defaults:
-  - db/mysql  # use db/mysql.yaml unconditionally
-```
-Config files loaded this way are not a part of a config group and will always be loaded.
-They cannot be overridden. In general it is recommended to use the first form (config group default) when possible.
+ - db: mysql
+ - override db/engine: myiasm
+ ```
+In the above example, the override for `db/engine` will change the default
+selection from the config `db/mysql` from `innodb` to `myiasm`.
 
-## Defaults list resolution
-When composing the [Output Config Object](/terminology.md#output-config-object), Hydra will first create the final Defaults List and will then compose the
-config with it.
+## Relocating config content in the composed config (Overriding packages)
+By default, the package of a config is derived from the config group it is in.
 
-Creating the final defaults list is a complex process: Configs mentioned in the list may have
-their own defaults list, sometimes defining the same config groups!
+One may want to place the content into a config package other than the default in some cases, for example, when:
+ - Using a config group from another library
+ - Using a config from the same config group more than once
 
-The behavior that process is implementing can be described by two simple rules:
-1. The last appearance of a config group determines the final value for that group
-2. First appearance of a config group determines the composition order for that group
+Overriding the package of a config relocates the entire subtree.
 
-The first rule allows you to always override a config group selection that was made earlier.
-The second rules ensures that composition order is respected.
+### Determining the final package
+The priority for determining the package for a config is as follows:
 
-## Composition order and `_self_`
-A config can contain both a Defaults List and config nodes.
+1. The package specified in the Defaults List (relative to the including config)
+2. The package specified in the config header (absolute)
+3. The default package
 
-The special element `_self_` can be added to determine the composition order of this config relative to the items
-in the defaults list.
 
-If `_self_` is not specified, it is implicitly inserted at the top of the defaults list.
-This means that by default, elements in the defaults list are composed **after** the config declaring the Defaults List.
+### How to override config packages
+**TODO**: decide what to do with overriding_packages.md
+
+For this topic, let’s create a nested config hierarchy with the following directory structure and configs:
 
 <div className="row">
-<div className="col col--6">
+<div className="col col--4">
 
-```yaml title="Input without _self_"
+```text title="Directory structure"
+config.yaml
+db/
+  mysql.yaml
+  engine/
+     innodb.yaml
+```
+</div>
+<div className="col  col--4">
+
+```yaml title="config.yaml"
 defaults:
- - foo: bar
+  - db: mysql
+
+
 
 ```
 </div>
+<div className="col col--4">
 
-<div className="col  col--6">
-
-```yaml title="Is equivalent to"
+```yaml title="db/mysql.yaml"
 defaults:
- - _self_
- - foo: bar
+  - engine: innodb
+
+
+
+```
+</div>
+</div>
+
+## Overriding the package via the defaults list
+The following relocates the packages of `db/mysql` and `db/engine/innodb` from `db` and `db.engine` to `backup` and `backup.engine` respectively.
+
+```yaml title="config.yaml":
+defaults:
+  - db@backup: mysql
 ```
 
-</div>
-</div>
+### Overriding the package with package header
+The default package of a config can also be changed via the package header.
+```yaml title="db/mysql.yaml" {1}
+# @package foo.bar
+hostname: localhost
+port: 3306
+```
 
-An example with two config files:
+**NOTE**: Packages specified in the package header are absolute. The package of `db/mysql.yaml` above is `foo.bar`, not `db.foo.bar`.
+
+
+## Extending a base config
+A common need is to take an existing config and to change it slightly, overriding a few values.
+Each config can contain config content and a Defaults List. 
+The `_self_` element can be added to the defaults list to determine the composition order of this
+config relative to the other configs in the defaults list:
 
 <div className="row">
 <div className="col col--6">
 
 ```yaml title="config.yaml"
 defaults:
- - _self_
- - db: mysql
+  - _self_
+  - db: mysql # Overrides this config 
+
+db: ???
 ```
-
 </div>
-
 <div className="col  col--6">
 
-```yaml title="db/mysql.yaml"
-defaults:
- - mysql/engine: innodb
- - _self_
+```yaml title="Result: All values from db/mysql"
+db:
+  driver: mysql     
+  host: localhost
+  port: 3306
 ```
 </div>
 </div>
 
-
-When composing `config.yaml`, the resulting defaults list will be:
-```yaml
-defaults:
- - config              # per defaults list in config.yaml, it comes first (_self_)
- - mysql/engine/innodb # first per defaults list in db/mysql  
- - db/mysql            # second per defaults list in db/mysql (_self_)
-```
-
-The last two items are added as a result of the expansion of `db/mysql.yaml`.
-
-## Interpolation
-The Defaults List supports a limited form of interpolation that differs from the normal interpolation in several aspects.
-- The Defaults List is resolved before the config is computed, so it cannot refer to nodes from the computed config.
-- The defaults list can interpolate with config groups directly
-
-```yaml
-defaults:
- - dataset: imagenet
- - model: alexnet
- - optional dataset_model: ${dataset}_{model} # will become imagenet_alexnet
-```
-
-See [Specializing Configs](/patterns/specializing_config.md) for a more detailed explanation of this example.
-
-## Renaming packages
-Packages of previously defined config groups can be overridden by later items in the Defaults List.
-The syntax is similar to that described in [Basic Override syntax](/advanced/override_grammar/basic.md#modifying-the-defaults-list),
- 
 <div className="row">
 <div className="col col--6">
 
-```yaml title="Moving to package src"
+```yaml title="config.yaml"
 defaults:
-  - db: mysql
-  - 'db@:src': _keep_
-```
+  - db: mysql  
+  - _self_   # Overrides db/mysql
 
-```yaml title="Renaming package from src to dst"
-defaults:
-  - db@src: mysql
-  - 'db@src:dst': _keep_
-```
-
-```yaml title="Renaming package and changing choice"
-defaults:
-  - db: mysql
-  - 'db@:src': postgresql
+db:
+  port: 3307
 ```
 
 </div>
 
 <div className="col  col--6">
 
-```yaml title="Result"
-defaults:
-  - db@src: mysql
+```yaml title="Result: db.port from config"
+db:
+  driver: mysql
+  host: localhost
+  port: 3307
+
 
 ```
-
-```yaml title="Result"
-defaults:
-  - db@dst: mysql
-
-```
-
-```yaml title="Result"
-defaults:
-  - db@dst: postgresql
-
-```
-
 
 </div>
 </div>
 
+If `_self_` is not specified in the Defaults List, it is implicitly added as the first item.
 
-## Deleting from the defaults list
-Previously defined config groups can be deleted by later items in the Defaults List. 
-The syntax is similar to that described in [Basic Override syntax](/advanced/override_grammar/basic.md#modifying-the-defaults-list),
+## Extending a config in the same config group
 
-```yaml
-defaults:
- - db: mysql
- - ~db # will delete `db` from the list regardless of the choice
-```
-
-```yaml
-defaults:
- - db: mysql
- - ~db: mysql # will delete db from the list if the selected value is mysql
-```
-
-
-
-## Config "Inheritance" via composition
-
-TODO: should probably not be here
-
-A common pattern is to "extend" a base config:
-```yaml title="agent.yaml"
-name: ???
-age: ???
-agency: mi6
-```
-
-```yaml title="bond.yaml"
-defaults:
-  - agent
-  - _self_
-
-name: Bond, James Bond
-age: 7
-```
-
-In the above example, `bond.yaml` is overriding the name and age in `base.yaml`
-The resulting config will thus be:
-```yaml
-name: Bond, James Bond
-age: 7
-agency: mi6
-```
-
+# TODO:
+ - document group defaults and config defaults
